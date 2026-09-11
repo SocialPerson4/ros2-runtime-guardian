@@ -77,7 +77,9 @@ docs/             # 复现说明、边界与路线图
 
 本仓库没有复制 ROS 2、diagnostics、ros2_tracing 或 Nav2 的源码。它使用 ROS 2 的公开概念和接口作为复现依据，所有上游地址、复现范围和差异见 [UPSTREAM.md](UPSTREAM.md)。个人完成内容应仅指本仓库中的采样、关联、回放、策略和测试代码。
 
+面向 OS 软件方向的候选复现项目及建议顺序见
+[docs/OS_REFERENCE_PROJECTS.md](docs/OS_REFERENCE_PROJECTS.md)。
+
 ## License
 
 MIT
-
