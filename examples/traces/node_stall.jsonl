@@ -1,0 +1,4 @@
+{"time_s": 0, "node": "camera_pipeline", "namespace": "/robot", "pid": 4102, "heartbeat_age_s": 0.2, "process": {"pid": 4102, "name": "camera_node", "state": "S", "cpu_percent": 22.4, "rss_bytes": 125829120, "threads": 8, "fd_count": 34, "cmdline": "camera_node --ros-args"}}
+{"time_s": 5, "node": "camera_pipeline", "namespace": "/robot", "pid": 4102, "heartbeat_age_s": 6.4, "process": {"pid": 4102, "name": "camera_node", "state": "R", "cpu_percent": 97.2, "rss_bytes": 130023424, "threads": 8, "fd_count": 35, "cmdline": "camera_node --ros-args"}}
+{"time_s": 10, "node": "camera_pipeline", "namespace": "/robot", "pid": 4102, "heartbeat_age_s": 11.4, "process": null}
+

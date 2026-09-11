@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ros2-runtime-guardian"
+version = "0.1.0"
+description = "Reproducible ROS 2 and Linux runtime diagnostics experiments"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Wang Yuqin"}]
+dependencies = []
+
+[project.scripts]
+runtime-guardian = "ros2_runtime_guardian.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["ros2_runtime_guardian*"]
+
