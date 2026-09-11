@@ -23,6 +23,9 @@ class ProcessSnapshot:
     fd_count: int
     cmdline: str = ""
 
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
 
 @dataclass(frozen=True)
 class NodeSnapshot:
@@ -62,4 +65,3 @@ class RecoveryDecision:
     execute: bool
     reason: str
     attempt: int
-

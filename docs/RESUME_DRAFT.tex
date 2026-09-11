@@ -1,0 +1,12 @@
+% 仅在亲自完成核心复现、能够解释代码后使用。
+% 当前定位：开源复现，正在实现；不得改为“独立完成的成熟系统”。
+
+\datedsubsection{\textbf{ROS 2运行时诊断与跨层故障关联原型}\hfill\textbf{开源复现（进行中）}}{2026.09 - 至今}
+
+\begin{itemize}[parsep=0.5ex]
+  \item \textbf{项目背景：}面向Linux机器人主机运行异常难以跨层定位的问题，学习并复现ROS 2 diagnostics的分级诊断思路，探索ROS节点状态与操作系统进程指标的关联分析。
+
+  \item \textbf{核心工作：}在AI辅助下搭建项目原型，基于Python读取Linux \textbf{/proc} 文件系统，采集进程CPU、RSS内存、线程及文件描述符信息；实现心跳超时与进程存活、CPU压力的\textbf{跨层关联规则}，并设计带冷却时间和次数限制的dry-run恢复策略。
+
+  \item \textbf{当前进展：}已完成确定性JSONL故障回放、Docker复现环境及GitHub Actions配置，核心模块通过\textbf{13项本地单元测试}；ROS 2在线接入与树莓派性能测试仍在实现。
+\end{itemize}

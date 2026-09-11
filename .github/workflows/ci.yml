@@ -21,4 +21,5 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Deterministic replay
         run: python -m ros2_runtime_guardian replay examples/traces/node_stall.jsonl
-
+      - name: Linux procfs smoke test
+        run: python -m ros2_runtime_guardian sample --pid self

@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-`v0.1` 是一个可运行的最小基线：Linux `/proc` 进程采样、ROS/OS 状态关联、确定性故障回放和单元测试已经实现。ROS 2 在线节点与树莓派性能实验仍列在路线图中，因此 README 不报告尚未产生的真机指标。
+`v0.1` 是正在实现的最小基线：Linux `/proc` 进程采样、ROS/OS 状态关联、确定性故障回放和单元测试已有可运行代码。ROS 2 在线节点与树莓派性能实验仍列在路线图中，因此 README 不报告尚未产生的真机指标。
 
 ## 为什么做这个项目
 
@@ -20,6 +20,7 @@ ROS 2 的节点、Topic 和 QoS 异常通常在中间件层被观察，而 CPU�
 - **安全恢复**：提供冷却时间与恢复预算，只生成恢复决策；默认不执行 `kill`、重启或网络配置命令。
 - **确定性回放**：使用 JSONL 轨迹复现节点正常、CPU饱和和进程退出场景。
 - **持续验证**：标准库单元测试与 GitHub Actions，不需要机械硬件即可检查核心逻辑。
+- **Linux冒烟测试**：CI 在 Ubuntu 上读取自身进程的真实 `/proc` 数据，验证采样链路不是纯模拟。
 
 ## 工程改进点
 
@@ -39,6 +40,8 @@ git clone https://github.com/SocialPerson4/ros2-runtime-guardian.git
 cd ros2-runtime-guardian
 python3 -m unittest discover -s tests -v
 python3 -m ros2_runtime_guardian replay examples/traces/node_stall.jsonl
+# Linux环境可额外执行
+python3 -m ros2_runtime_guardian sample --pid self
 ```
 
 也可以运行：
@@ -79,6 +82,9 @@ docs/             # 复现说明、边界与路线图
 
 面向 OS 软件方向的候选复现项目及建议顺序见
 [docs/OS_REFERENCE_PROJECTS.md](docs/OS_REFERENCE_PROJECTS.md)。
+
+本项目使用生成式 AI 辅助搭建初始代码、测试与文档。AI 的参与范围、当前人工核验状态和简历表述边界见
+[docs/AI_USAGE.md](docs/AI_USAGE.md)。运行时本身没有接入大模型或云端 AI 服务。
 
 ## License
 
