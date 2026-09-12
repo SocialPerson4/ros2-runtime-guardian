@@ -22,7 +22,7 @@
 - Required evidence: ROS distribution, RMW implementation, workload, fault injection parameters, at least five repeated runs
 - Required metrics: detection latency, recovery latency, CPU/RSS overhead and false-positive count
 
-Level C is not complete in `v0.1`. Do not convert planned experiments into resume results.
+Level C is not included in `v0.1`; the repository currently contains no ROS 2 online experiment artifacts.
 
 ## Determinism
 
@@ -38,4 +38,3 @@ Store generated artifacts outside Git by default. Each experiment record should 
 4. fault type and injection time;
 5. raw findings;
 6. summary statistics derived from raw data.
-

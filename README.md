@@ -1,102 +1,119 @@
-# ROS 2 Runtime Guardian（OS侧原型）
+# ROS 2 Runtime Guardian
 
-面向 Linux 机器人主机的 ROS 2 运行时观测与故障关联实验项目。
+面向 Linux 机器人主机的进程观测与故障关联规则原型。项目尝试把节点心跳状态与 Linux 进程指标组合为可解释诊断，并为后续接入 ROS 2 在线数据和受控恢复机制建立独立、可测试的 OS 侧核心。
 
-> 项目定位：面向未来 ROS 2 在线接入的 Linux 进程观测与故障关联规则原型。当前版本不是完整 ROS 2 诊断系统，也不是机器人机械结构或控制算法项目。
+- 开发方式：独立开发
+- 开发时间：2026.07 至今
+- 当前版本：v0.1 OS 侧原型
 
-## 当前状态
+## 问题背景
 
-`v0.1` 是正在实现的最小基线：Linux `/proc` 进程采样、对外部节点状态的关联规则、确定性故障回放和15项单元测试已有可运行代码。`heartbeat_age_s` 当前来自回放输入或调用方，不是由 `rclpy` 在线测得；ROS 2节点适配与树莓派性能实验仍在路线图中。
+ROS 2 的节点、Topic 和 QoS 状态通常从中间件侧观察，而 CPU、内存、线程、文件描述符和进程状态属于 Linux OS 层。单独观察一个层面时，难以区分进程退出、进程仍存活但资源压力较高、以及通信或回调暂时延迟等情况。
 
-| 模块 | 状态 | 可以怎样表述 |
-|---|---|---|
-| `/proc`进程采样 | 已实现 | OS侧采样基线 |
-| JSONL规则回放 | 已实现 | 确定性回归输入，不是真机实验 |
-| 关联规则 | 已实现原型 | 对调用方提供的心跳年龄与进程指标做规则关联 |
-| dry-run恢复决策 | 已实现原型 | 只生成决策，不执行重启 |
-| `rclpy`、ROS Graph、QoS事件 | 未实现 | 只能写“正在接入” |
-| 树莓派ROS 2实验 | 未实施 | 不得报告性能或检测延迟 |
+本项目将两类信息收敛到统一数据模型中，通过规则输出诊断级别、触发证据和建议动作。当前版本已经实现 Linux 采样与规则核心；心跳年龄由回放数据或调用方提供，ROS 2 在线适配仍在路线图中。
 
-## 为什么做这个项目
+## 系统结构
 
-ROS 2 的节点、Topic 和 QoS 异常通常在中间件层被观察，而 CPU、内存、线程、文件描述符和进程状态属于 Linux OS 层。只看其中一层，很难区分“节点真的退出”“进程仍在但被资源压力拖慢”以及“通信暂时抖动”。本项目尝试把两层证据合并成可解释诊断。
+```text
+外部节点状态                 Linux 进程状态
+heartbeat_age_s             /proc/<pid>/{stat,status,cmdline,fd}
+        │                              │
+        └──────────┬───────────────────┘
+                   ▼
+            NodeSnapshot 数据模型
+                   │
+                   ▼
+           CrossLayerCorrelator
+                   │
+                   ├── Finding 证据与严重级别
+                   └── RecoveryController
+                         冷却时间 次数预算 dry-run
+```
 
-## 已实现
+## 已实现功能
 
-- **Linux采样**：直接读取 `/proc/<pid>/stat`、`status`、`cmdline` 和 `fd`；两次采样计算CPU，并用进程启动时间识别PID复用。
-- **跨层规则**：联合节点心跳年龄与进程存活、CPU、RSS、线程数、文件描述符数量生成诊断。
-- **解释性输出**：每条 Finding 保存触发规则、严重级别、原始证据和建议动作。
-- **安全恢复**：提供冷却时间与恢复预算，只生成恢复决策；默认不执行 `kill`、重启或网络配置命令。
-- **确定性回放**：使用 JSONL 轨迹复现节点正常、CPU饱和和进程退出场景。
-- **持续验证**：标准库单元测试与 GitHub Actions，不需要机械硬件即可检查核心逻辑。
-- **Linux冒烟测试**：CI 在 Ubuntu 上读取自身进程的真实 `/proc` 数据，验证OS侧采样链路不是纯模拟。
+- **Linux 进程采样**：读取 `/proc/<pid>/stat`、`status`、`cmdline` 和 `fd`。
+- **CPU 双采样计算**：根据进程 tick 增量与单调时钟区间计算 CPU 占用。
+- **PID 复用保护**：保存 `start_time_ticks`，进程启动时间变化时重置 CPU 基线。
+- **关联规则**：组合心跳年龄、进程存活、CPU、RSS 和文件描述符数量生成诊断。
+- **可解释输出**：每条 Finding 保存规则编号、严重级别、原始证据和建议动作。
+- **受限恢复决策**：使用冷却时间和次数预算生成 dry-run 决策，不直接执行系统命令。
+- **确定性回放**：通过固定 JSONL 轨迹复现正常、CPU 压力和进程退出场景。
+- **持续验证**：15 项单元测试与 GitHub Actions；Ubuntu CI 额外读取真实 `/proc` 数据。
 
-## 工程改进点
+## 工程设计
 
-这些是相对基础监控流程的工程改进，不宣称学术首创：
+1. **多源证据关联**：把节点状态和 OS 指标放入同一诊断上下文，减少只看单一阈值时的信息缺失。
+2. **机器可读 Finding**：统一保存诊断原因、证据和动作提示，便于记录、回放和后续适配。
+3. **确定性回归输入**：固定轨迹与固定规则输出，使规则调整可以重复比较。
+4. **受限决策机制**：恢复建议受冷却时间和次数预算限制，避免连续触发重启请求。
 
-1. **ROS—OS跨层关联**：把心跳超时与进程状态、CPU/RSS等证据合并，减少单指标告警。
-2. **可解释Finding**：诊断结果携带机器可读证据，便于复盘“为什么报警”。
-3. **确定性故障回放**：固定轨迹、固定输出，使规则修改前后可以回归比较。
-4. **受限恢复策略**：冷却时间、次数预算和默认 dry-run，避免监控器造成重启风暴。
+## 快速复现
 
-## 30秒复现
-
-要求：Python 3.10+。当前OS侧原型不要求安装ROS 2。
+要求 Python 3.10 及以上。v0.1 的 OS 侧核心不要求安装 ROS 2。
 
 ```bash
 git clone https://github.com/SocialPerson4/ros2-runtime-guardian.git
 cd ros2-runtime-guardian
 python3 -m unittest discover -s tests -v
 python3 -m ros2_runtime_guardian replay examples/traces/node_stall.jsonl
-# Linux环境可额外执行；默认间隔0.2秒做两次CPU采样
+```
+
+Linux 环境还可以运行真实 procfs 采样：
+
+```bash
 python3 -m ros2_runtime_guardian sample --pid self --interval 0.2
 ```
 
-也可以运行：
+也可以使用统一命令：
 
 ```bash
 make reproduce
 ```
 
-预期现象：15项测试通过；回放输出 `heartbeat_stale_with_cpu_pressure` 与 `process_missing` 两类诊断。不要把回放结果写成ROS在线或树莓派真机实验结果。
+示例回放会输出 `heartbeat_stale_with_cpu_pressure` 和 `process_missing` 两类诊断。
 
-## ROS 2 在线模式边界
+## 当前实现范围
 
-仓库保留了 ROS 2 接入层的接口位置，但 `v0.1` 的自动化测试只覆盖与 ROS 解耦的核心。后续计划在 Ubuntu 24.04 + ROS 2 Jazzy 上：
+| 模块 | 状态 | 验证方式 |
+|---|---|---|
+| `/proc` 进程采样 | 已实现 | 单元测试与 Ubuntu CI 冒烟测试 |
+| JSONL 规则回放 | 已实现 | 固定轨迹回归测试 |
+| 心跳与进程指标关联 | 原型完成 | 调用方提供心跳年龄 |
+| dry-run 恢复决策 | 原型完成 | 冷却时间与预算测试 |
+| `rclpy` 与 ROS Graph 接入 | 规划中 | 尚无在线采集数据 |
+| 树莓派 ROS 2 实验 | 规划中 | 尚无性能数据 |
 
-- 读取 ROS graph 与 `/diagnostics`；
-- 通过显式注册建立 Node 与 PID 的映射；
-- 接入 QoS Deadline / Liveliness 事件；
-- 在树莓派上记录检测延迟、恢复耗时和监控开销。
+详细状态见 [项目状态](docs/PROJECT_STATUS.md)，复现层级与实验记录格式见 [复现说明](docs/REPRODUCIBILITY.md)。
 
 ## 项目结构
 
 ```text
 ros2_runtime_guardian/
-  models.py       # 跨层状态与诊断数据模型
-  procfs.py       # Linux /proc 采样器
-  correlator.py   # ROS/OS关联规则
-  recovery.py     # 有预算的dry-run恢复决策
-  replay.py       # JSONL故障轨迹回放
+  models.py       # 进程 节点 Finding 与恢复决策数据模型
+  procfs.py       # Linux procfs 采样器
+  correlator.py   # 节点状态与 OS 指标关联规则
+  recovery.py     # 有预算的 dry-run 恢复决策
+  replay.py       # JSONL 故障轨迹回放
   cli.py          # 命令行入口
 examples/traces/  # 可重复的输入轨迹
 tests/            # 单元测试
-docs/             # 复现说明、边界与路线图
+docs/             # 项目状态 复现说明与路线图
 ```
 
-## 开源来源与个人工作边界
+## 后续计划
 
-本仓库没有复制 ROS 2、diagnostics、ros2_tracing 或 Nav2 的源码。它使用 ROS 2 的公开概念和接口作为复现依据，所有上游地址、复现范围和差异见 [UPSTREAM.md](UPSTREAM.md)。个人完成内容应仅指本仓库中的采样、关联、回放、策略和测试代码。
+- 订阅节点心跳和 `/diagnostics`。
+- 设计节点名称、PID、进程启动时间和可执行文件的显式注册协议。
+- 输出 `diagnostic_msgs/DiagnosticArray`。
+- 接入 QoS Deadline 和 Liveliness 事件。
+- 增加 systemd 适配、cgroup v2 与 PSI 指标。
+- 在树莓派上记录检测延迟、恢复耗时和监控开销。
 
-面向 OS 软件方向的候选复现项目及建议顺序见
-[docs/OS_REFERENCE_PROJECTS.md](docs/OS_REFERENCE_PROJECTS.md)。
+完整阶段计划见 [ROADMAP](docs/ROADMAP.md)。
 
-本项目使用生成式AI辅助搭建初始代码、测试与文档。AI的参与范围、当前人工核验状态和简历表述边界见
-[docs/AI_USAGE.md](docs/AI_USAGE.md)。运行时本身没有接入大模型或云端 AI 服务。
+## 上游参考与许可证
 
-答辩前请阅读 [导师压力追问](docs/DEFENSE.md)。最重要的边界是：当前“跨层”规则消费调用方提供的心跳年龄，尚未完成ROS 2在线证据采集。
+项目依据 ROS 2 公开概念和接口设计数据边界，没有复制 ROS 2、diagnostics、ros2_tracing 或 Nav2 的源码。上游来源和差异见 [UPSTREAM.md](UPSTREAM.md)。
 
-## License
-
-MIT
+本项目采用 MIT License。
