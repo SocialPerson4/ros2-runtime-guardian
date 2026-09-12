@@ -1,12 +1,21 @@
-# ROS 2 Runtime Guardian
+# ROS 2 Runtime Guardian（OS侧原型）
 
 面向 Linux 机器人主机的 ROS 2 运行时观测与故障关联实验项目。
 
-> 项目定位：复现 ROS 2 diagnostics / tracing 的基本观测思路，并在此基础上实现少量、可验证的跨层关联与安全恢复策略。它不是机器人机械结构或控制算法项目。
+> 项目定位：面向未来 ROS 2 在线接入的 Linux 进程观测与故障关联规则原型。当前版本不是完整 ROS 2 诊断系统，也不是机器人机械结构或控制算法项目。
 
 ## 当前状态
 
-`v0.1` 是正在实现的最小基线：Linux `/proc` 进程采样、ROS/OS 状态关联、确定性故障回放和单元测试已有可运行代码。ROS 2 在线节点与树莓派性能实验仍列在路线图中，因此 README 不报告尚未产生的真机指标。
+`v0.1` 是正在实现的最小基线：Linux `/proc` 进程采样、对外部节点状态的关联规则、确定性故障回放和15项单元测试已有可运行代码。`heartbeat_age_s` 当前来自回放输入或调用方，不是由 `rclpy` 在线测得；ROS 2节点适配与树莓派性能实验仍在路线图中。
+
+| 模块 | 状态 | 可以怎样表述 |
+|---|---|---|
+| `/proc`进程采样 | 已实现 | OS侧采样基线 |
+| JSONL规则回放 | 已实现 | 确定性回归输入，不是真机实验 |
+| 关联规则 | 已实现原型 | 对调用方提供的心跳年龄与进程指标做规则关联 |
+| dry-run恢复决策 | 已实现原型 | 只生成决策，不执行重启 |
+| `rclpy`、ROS Graph、QoS事件 | 未实现 | 只能写“正在接入” |
+| 树莓派ROS 2实验 | 未实施 | 不得报告性能或检测延迟 |
 
 ## 为什么做这个项目
 
@@ -14,13 +23,13 @@ ROS 2 的节点、Topic 和 QoS 异常通常在中间件层被观察，而 CPU�
 
 ## 已实现
 
-- **Linux采样**：直接读取 `/proc/<pid>/stat`、`status`、`cmdline` 和 `fd`，不依赖常驻采集代理。
+- **Linux采样**：直接读取 `/proc/<pid>/stat`、`status`、`cmdline` 和 `fd`；两次采样计算CPU，并用进程启动时间识别PID复用。
 - **跨层规则**：联合节点心跳年龄与进程存活、CPU、RSS、线程数、文件描述符数量生成诊断。
 - **解释性输出**：每条 Finding 保存触发规则、严重级别、原始证据和建议动作。
 - **安全恢复**：提供冷却时间与恢复预算，只生成恢复决策；默认不执行 `kill`、重启或网络配置命令。
 - **确定性回放**：使用 JSONL 轨迹复现节点正常、CPU饱和和进程退出场景。
 - **持续验证**：标准库单元测试与 GitHub Actions，不需要机械硬件即可检查核心逻辑。
-- **Linux冒烟测试**：CI 在 Ubuntu 上读取自身进程的真实 `/proc` 数据，验证采样链路不是纯模拟。
+- **Linux冒烟测试**：CI 在 Ubuntu 上读取自身进程的真实 `/proc` 数据，验证OS侧采样链路不是纯模拟。
 
 ## 工程改进点
 
@@ -33,15 +42,15 @@ ROS 2 的节点、Topic 和 QoS 异常通常在中间件层被观察，而 CPU�
 
 ## 30秒复现
 
-要求：Python 3.10+。核心复现不要求安装 ROS 2。
+要求：Python 3.10+。当前OS侧原型不要求安装ROS 2。
 
 ```bash
 git clone https://github.com/SocialPerson4/ros2-runtime-guardian.git
 cd ros2-runtime-guardian
 python3 -m unittest discover -s tests -v
 python3 -m ros2_runtime_guardian replay examples/traces/node_stall.jsonl
-# Linux环境可额外执行
-python3 -m ros2_runtime_guardian sample --pid self
+# Linux环境可额外执行；默认间隔0.2秒做两次CPU采样
+python3 -m ros2_runtime_guardian sample --pid self --interval 0.2
 ```
 
 也可以运行：
@@ -50,7 +59,7 @@ python3 -m ros2_runtime_guardian sample --pid self
 make reproduce
 ```
 
-预期现象：测试全部通过；回放输出 `heartbeat_stale_with_cpu_pressure` 与 `process_missing` 两类诊断。不要在论文或简历中把回放结果写成真机实验结果。
+预期现象：15项测试通过；回放输出 `heartbeat_stale_with_cpu_pressure` 与 `process_missing` 两类诊断。不要把回放结果写成ROS在线或树莓派真机实验结果。
 
 ## ROS 2 在线模式边界
 
@@ -83,8 +92,10 @@ docs/             # 复现说明、边界与路线图
 面向 OS 软件方向的候选复现项目及建议顺序见
 [docs/OS_REFERENCE_PROJECTS.md](docs/OS_REFERENCE_PROJECTS.md)。
 
-本项目使用生成式 AI 辅助搭建初始代码、测试与文档。AI 的参与范围、当前人工核验状态和简历表述边界见
+本项目使用生成式AI辅助搭建初始代码、测试与文档。AI的参与范围、当前人工核验状态和简历表述边界见
 [docs/AI_USAGE.md](docs/AI_USAGE.md)。运行时本身没有接入大模型或云端 AI 服务。
+
+答辩前请阅读 [导师压力追问](docs/DEFENSE.md)。最重要的边界是：当前“跨层”规则消费调用方提供的心跳年龄，尚未完成ROS 2在线证据采集。
 
 ## License
 

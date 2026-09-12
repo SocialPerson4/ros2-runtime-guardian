@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from collections.abc import Sequence
 
 from .procfs import ProcessGoneError, ProcfsSampler
@@ -11,13 +12,21 @@ from .replay import replay
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="ROS 2 and Linux runtime diagnostics experiments")
+    parser = argparse.ArgumentParser(
+        description="Linux process diagnostics core for future ROS 2 integration"
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     replay_parser = commands.add_parser("replay", help="replay a deterministic JSONL fault trace")
     replay_parser.add_argument("trace", help="path to JSONL trace")
     sample_parser = commands.add_parser("sample", help="read one Linux process from procfs")
     sample_parser.add_argument("--pid", default="self", help="numeric PID or 'self' (default)")
     sample_parser.add_argument("--proc-root", default="/proc", help="procfs root; useful for tests")
+    sample_parser.add_argument(
+        "--interval",
+        type=float,
+        default=0.2,
+        help="seconds between CPU baseline and measurement (default: 0.2)",
+    )
     return parser
 
 
@@ -32,7 +41,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "sample":
         try:
             pid = os.getpid() if args.pid == "self" else int(args.pid)
-            snapshot = ProcfsSampler(args.proc_root).sample(pid)
+            if args.interval < 0:
+                raise ValueError("interval must be non-negative")
+            sampler = ProcfsSampler(args.proc_root)
+            sampler.sample(pid)
+            if args.interval:
+                time.sleep(args.interval)
+            snapshot = sampler.sample(pid)
         except (ValueError, ProcessGoneError, PermissionError) as exc:
             print(f"sample failed: {exc}", file=sys.stderr)
             return 1

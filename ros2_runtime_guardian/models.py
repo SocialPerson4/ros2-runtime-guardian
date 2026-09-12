@@ -22,6 +22,7 @@ class ProcessSnapshot:
     threads: int
     fd_count: int
     cmdline: str = ""
+    start_time_ticks: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -38,7 +39,8 @@ class NodeSnapshot:
 
     @property
     def fq_name(self) -> str:
-        namespace = self.namespace.rstrip("/")
+        namespace = self.namespace.strip("/")
+        namespace = f"/{namespace}" if namespace else ""
         return f"{namespace}/{self.name}" if namespace else f"/{self.name}"
 
 

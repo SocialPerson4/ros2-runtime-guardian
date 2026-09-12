@@ -16,6 +16,7 @@ class ProcessGoneError(RuntimeError):
 class _CpuPoint:
     ticks: int
     observed_at: float
+    start_time_ticks: int
 
 
 class ProcfsSampler:
@@ -45,10 +46,16 @@ class ProcfsSampler:
         ticks = stat["utime"] + stat["stime"]
         previous = self._cpu_points.get(pid)
         cpu_percent = 0.0
-        if previous is not None and observed_at > previous.observed_at:
+        if (previous is not None
+                and previous.start_time_ticks == stat["starttime"]
+                and observed_at > previous.observed_at):
             cpu_seconds = (ticks - previous.ticks) / self.clock_ticks
             cpu_percent = max(0.0, cpu_seconds / (observed_at - previous.observed_at) * 100.0)
-        self._cpu_points[pid] = _CpuPoint(ticks=ticks, observed_at=observed_at)
+        self._cpu_points[pid] = _CpuPoint(
+            ticks=ticks,
+            observed_at=observed_at,
+            start_time_ticks=int(stat["starttime"]),
+        )
 
         try:
             fd_count = sum(1 for _ in (process_dir / "fd").iterdir())
@@ -64,6 +71,7 @@ class ProcfsSampler:
             threads=int(status.get("Threads", "0")),
             fd_count=fd_count,
             cmdline=cmdline_raw.replace(b"\x00", b" ").decode(errors="replace").strip(),
+            start_time_ticks=int(stat["starttime"]),
         )
 
     @staticmethod
@@ -99,4 +107,3 @@ class ProcfsSampler:
     def _parse_kib(value: str) -> int:
         token = value.split()[0] if value else "0"
         return int(token)
-

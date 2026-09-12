@@ -27,6 +27,10 @@ class CorrelatorTests(unittest.TestCase):
         snapshot = NodeSnapshot("demo", "/robot", 42, 0.1, process())
         self.assertEqual(self.engine.evaluate(snapshot), [])
 
+    def test_node_namespace_is_normalized(self):
+        snapshot = NodeSnapshot("demo", "robot", 42, 0.1, process())
+        self.assertEqual(snapshot.fq_name, "/robot/demo")
+
     def test_missing_process_is_critical(self):
         snapshot = NodeSnapshot("demo", "/robot", 42, 8.0, None)
         finding = self.engine.evaluate(snapshot)[0]
@@ -50,4 +54,3 @@ class CorrelatorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

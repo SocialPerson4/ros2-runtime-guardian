@@ -29,7 +29,10 @@ class CliTests(unittest.TestCase):
             (process / "stat").write_text(stat_line(77))
             output = io.StringIO()
             with redirect_stdout(output):
-                result = main(["sample", "--pid", "77", "--proc-root", directory])
+                result = main([
+                    "sample", "--pid", "77", "--proc-root", directory,
+                    "--interval", "0",
+                ])
             self.assertEqual(result, 0)
             self.assertIn('"pid": 77', output.getvalue())
             self.assertIn('"rss_bytes": 1048576', output.getvalue())
@@ -37,4 +40,3 @@ class CliTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

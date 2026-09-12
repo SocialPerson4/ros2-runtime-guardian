@@ -6,11 +6,11 @@ from pathlib import Path
 from ros2_runtime_guardian.procfs import ProcfsSampler, ProcessGoneError
 
 
-def stat_line(pid: int, name: str, utime: int, stime: int) -> str:
+def stat_line(pid: int, name: str, utime: int, stime: int, starttime: int = 12345) -> str:
     fields = ["S"] + ["0"] * 49
     fields[11] = str(utime)
     fields[12] = str(stime)
-    fields[19] = "12345"
+    fields[19] = str(starttime)
     return f"{pid} ({name}) " + " ".join(fields)
 
 
@@ -39,6 +39,7 @@ class ProcfsTests(unittest.TestCase):
         self.assertEqual(snapshot.threads, 3)
         self.assertEqual(snapshot.fd_count, 1)
         self.assertEqual(snapshot.cmdline, "demo_node --flag")
+        self.assertEqual(snapshot.start_time_ticks, 12345)
 
     def test_second_sample_calculates_cpu_delta(self):
         sampler = ProcfsSampler(self.root)
@@ -48,6 +49,17 @@ class ProcfsTests(unittest.TestCase):
         snapshot = sampler.sample(321, now=12.0)
         self.assertAlmostEqual(snapshot.cpu_percent, 50.0)
 
+    def test_pid_reuse_resets_cpu_baseline(self):
+        sampler = ProcfsSampler(self.root)
+        sampler.sample(321, now=10.0)
+        ticks = sampler.clock_ticks
+        (self.pid_dir / "stat").write_text(
+            stat_line(321, "new process", 100 + ticks, 20, starttime=99999)
+        )
+        snapshot = sampler.sample(321, now=12.0)
+        self.assertEqual(snapshot.cpu_percent, 0.0)
+        self.assertEqual(snapshot.start_time_ticks, 99999)
+
     def test_missing_process_raises_typed_error(self):
         sampler = ProcfsSampler(self.root)
         with self.assertRaises(ProcessGoneError):
@@ -56,4 +68,3 @@ class ProcfsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
